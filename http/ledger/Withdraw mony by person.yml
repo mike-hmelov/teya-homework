@@ -1,0 +1,22 @@
+info:
+  name: Withdraw mony by person
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: http://localhost:8080/accounts/591bbbab-a984-4cb1-bb4f-643657617949/transactions
+  body:
+    type: json
+    data: |-
+      {
+        "direction": "OUT",
+        "amount": 122
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
