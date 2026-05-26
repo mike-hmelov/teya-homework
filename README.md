@@ -34,9 +34,11 @@ Swagger UI is available at  **http://localhost:8080/swagger-ui/index.html**.
 
 ## API Reference
 
-### 1. Accounts
+All endpoints are scoped to a specific account. Create an account first, then use its `id` for subsequent requests.
 
-#### Create an Account
+---
+
+### Create an Account
 
 ```
 POST /accounts
@@ -45,195 +47,232 @@ Content-Type: application/json
 
 **Request body:**
 
-| Field  | Type   | Required | Description          |
-|--------|--------|----------|----------------------|
-| `name` | string | yes      | Name of the account  |
+| Field  | Type   | Required | Description             |
+|--------|--------|----------|-------------------------|
+| `name` | string | yes      | Display name of account |
 
 **Example:**
 
 ```bash
 curl -X POST http://localhost:8080/accounts \
   -H "Content-Type: application/json" \
-  -d '{"name":"John Doe"}'
+  -d '{"name":"Alice"}'
 ```
+
+**Response — 201 Created** (with `Location: /accounts/{id}` header):
 
 ```json
 {
-  "id": "a1b2c3d4-...",
-  "name": "John Doe",
-  "balance": 0
+  "id": "a1b2c3d4-e5f6-...",
+  "name": "Alice",
+  "balance": 0,
+  "transactions": []
 }
 ```
 
-#### Get Account Details (Balance)
-
-```
-GET /accounts/{id}
-```
-
-**Example:**
-
-```bash
-curl http://localhost:8080/accounts/a1b2c3d4-...
-```
+**Error — 400 Bad Request** (validation failure):
 
 ```json
 {
-  "id": "a1b2c3d4-...",
-  "name": "John Doe",
-  "balance": 3500.50
+  "error": "validation_error",
+  "details": [
+    {
+      "field": "name",
+      "message": "Name is required"
+    }
+  ]
 }
 ```
 
 ---
 
-### 2. Account Transactions
+### Get an Account
 
-#### Record a Transaction
+```
+GET /accounts/{id}
+```
+
+**Path parameters:**
+
+| Parameter | Description  |
+|-----------|--------------|
+| `id`      | Account UUID |
+
+**Example:**
+
+```bash
+curl http://localhost:8080/accounts/a1b2c3d4-e5f6-...
+```
+
+**Response — 200 OK:**
+
+```json
+{
+  "id": "a1b2c3d4-e5f6-...",
+  "name": "Alice",
+  "balance": 350.00,
+  "transactions": [
+    {
+      "amount": 500.00,
+      "direction": "IN",
+      "timestamp": "2026-05-27T19:35:00+00:00"
+    },
+    {
+      "amount": 150.00,
+      "direction": "OUT",
+      "timestamp": "2026-05-27T19:36:00+00:00"
+    }
+  ]
+}
+```
+
+**Error — 404 Not Found:**
+
+```json
+{
+  "error": "Account not found"
+}
+```
+
+---
+
+### Get Account Transactions
+
+```
+GET /accounts/{id}/transactions
+```
+
+Returns the transaction list for the specified account as a JSON array (streamed via `Flux`).
+
+**Example:**
+
+```bash
+curl http://localhost:8080/accounts/a1b2c3d4-e5f6-.../transactions
+```
+
+**Response — 200 OK:**
+
+```json
+[
+  {
+    "amount": 500.00,
+    "direction": "IN",
+    "timestamp": "2026-05-27T19:35:00+00:00"
+  },
+  {
+    "amount": 150.00,
+    "direction": "OUT",
+    "timestamp": "2026-05-27T19:36:00+00:00"
+  }
+]
+```
+
+**Error — 404 Not Found:**
+
+```json
+{
+  "error": "Account not found"
+}
+```
+
+---
+
+### Create a Transaction
 
 ```
 POST /accounts/{id}/transactions
 Content-Type: application/json
 ```
 
+**Path parameters:**
+
+| Parameter | Description  |
+|-----------|--------------|
+| `id`      | Account UUID |
+
 **Request body:**
 
-| Field       | Type   | Required | Description             |
-|-------------|--------|----------|-------------------------|
-| `direction` | string | yes      | `"IN"` or `"OUT"`       |
-| `amount`    | number | yes      | Amount (can be decimal) |
+| Field       | Type          | Required | Description                              |
+|-------------|---------------|----------|------------------------------------------|
+| `direction` | string (enum) | yes      | `"IN"` (deposit) or `"OUT"` (withdrawal) |
+| `amount`    | decimal       | yes      | Positive monetary amount (e.g. `150.00`) |
 
-**Example — Deposit:**
+**Example — Deposit (IN):**
 
 ```bash
-curl -X POST http://localhost:8080/accounts/a1b2c3d4-.../transactions \
+curl -X POST http://localhost:8080/accounts/a1b2c3d4-e5f6-.../transactions \
   -H "Content-Type: application/json" \
-  -d '{"direction":"IN","amount":50.0}'
+  -d '{"direction":"IN","amount":500.00}'
 ```
+
+**Response — 200 OK:**
 
 ```json
 {
-  "id": "t1x2y3z4-...",
-  "amount": 50.0,
+  "amount": 500.00,
   "direction": "IN",
-  "created": "2026-05-25T19:35:00Z"
+  "timestamp": "2026-05-27T19:35:00+00:00"
 }
 ```
 
-**Error — Insufficient funds (428):**
-
-```json
-{
-  "detail": "Insufficient funds",
-  "status": 428
-}
-```
-
-#### Get Account Transactions
-
-```
-GET /accounts/{id}/transactions
-```
-
-**Example:**
+**Example — Withdrawal (OUT):**
 
 ```bash
-curl http://localhost:8080/accounts/a1b2c3d4-.../transactions
-```
-
-```json
-[
-  {
-    "id": "t1x2y3z4-...",
-    "amount": 50.0,
-    "direction": "IN",
-    "created": "2026-05-25T19:35:00Z"
-  }
-]
-```
-
----
-
-### 3. Global Transactions
-
-#### Get Transaction by ID
-
-```
-GET /transactions/{id}
-```
-
-**Example:**
-
-```bash
-curl http://localhost:8080/transactions/t1x2y3z4-...
-```
-
-```json
-{
-  "id": "t1x2y3z4-...",
-  "amount": 50.0,
-  "direction": "IN",
-  "created": "2026-05-25T19:35:00Z"
-}
-```
-
-#### Search Transactions
-
-```
-POST /transactions/search
-Content-Type: application/json
-```
-
-**Request body (all optional):**
-
-| Field         | Type   | Description                                    | Default |
-|---------------|--------|------------------------------------------------|---------|
-| `direction`   | string | `"IN"` or `"OUT"`                              | -       |
-| `minAmount`   | number | Minimum amount                                 | -       |
-| `maxAmount`   | number | Maximum amount                                 | -       |
-| `limit`       | number | Maximum number of results to return (max 1000) | 100     |
-| `offset`      | number | Number of results to skip                      | 0       |
-
-**Example:**
-
-```bash
-curl -X POST http://localhost:8080/transactions/search \
+curl -X POST http://localhost:8080/accounts/a1b2c3d4-e5f6-.../transactions \
   -H "Content-Type: application/json" \
-  -d '{"direction":"OUT","limit":10}'
+  -d '{"direction":"OUT","amount":150.00}'
 ```
 
+**Error — 422 Unprocessable Entity** (insufficient funds):
+
 ```json
-[
-  {
-    "id": "t9x8y7z6-...",
-    "amount": 15.0,
-    "direction": "OUT",
-    "created": "2026-05-25T19:36:00Z"
-  }
-]
+{
+  "error": "Insufficient funds"
+}
+```
+
+**Error — 404 Not Found** (account does not exist):
+
+```json
+{
+  "error": "Account not found"
+}
+```
+
+**Error — 400 Bad Request** (validation failure):
+
+```json
+{
+  "error": "validation_error",
+  "details": [
+    {
+      "field": "amount",
+      "message": "must be greater than 0"
+    }
+  ]
+}
 ```
 
 ---
 
 ## Design Decisions & Assumptions
 
-Simple and straight forward implementation using Spring Boot and Kotlin
+A bit less naive implementation comparing to master branch
 
 ### Pros
 
-* Spring - well known framework. May handle security, authN/authZ, db connectivity, transaction management and many more
-* Spring Boot - allow to simply create executable binary, dockerize and deploy to any container supported platform
-* Spring and Spring Boot stack is well known - so easy to develop and maintain
-* Kotlin - language that supports multiple paradigms and allow to write not overbloated and clean code
-* Standard "onion" style architecture is applied - also well known to devs around, so easy to onboard new devs and
-  maintain
+1. Still Spring and Spring boot and kotlin is used including all advantages, however
+1. **Reactive Spring Boot (WebFlux)** - a bit more advanced stack is used - more performance, more throughput out the
+   box
+1. **CQRS** pattern
 
 ### Cons
 
-* Pretty heavy and resource demanding comparing to other possible solution
-* Default performance is not so good comparing to other options
+1. More advanced stack require more skilled stuff to develop and support
+2. Onboarding is a bit more complex
 
-Assumptions
+### Assumptions
+
 1. **In-memory storage** — Data is stored in a simple `MutableList` and is lost when the server restarts. No database is
    required.
 2. **No authentication/authorisation** — All endpoints are publicly accessible.
